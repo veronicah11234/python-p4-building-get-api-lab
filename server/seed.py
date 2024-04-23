@@ -1,25 +1,40 @@
-#!/usr/bin/env python3
+from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import MetaData
+from sqlalchemy_serializer import SerializerMixin
 
-from random import choice as rc
+metadata = MetaData(naming_convention={
+    "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
+})
 
-from app import app
-from models import db, Bakery, BakedGood
+db = SQLAlchemy(metadata=metadata)
 
-with app.app_context():
+class Bakery(db.Model, SerializerMixin):
+    __tablename__ = 'bakeries'
 
-    BakedGood.query.delete()
-    Bakery.query.delete()
-    
-    bakeries = []
-    bakeries.append(Bakery(name='Delightful donuts'));
-    bakeries.append(Bakery(name='Incredible crullers'));
-    db.session.add_all(bakeries)
+    serialize_rules = ('-baked_goods.bakery',)
 
-    baked_goods = []
-    baked_goods.append(BakedGood(name='Chocolate dipped donut', price=2.75, bakery=bakeries[0]));
-    baked_goods.append(BakedGood(name='Apple-spice filled donut', price=3.50, bakery=bakeries[0]));
-    baked_goods.append(BakedGood(name='Glazed honey cruller', price=3.25, bakery=bakeries[1]));
-    baked_goods.append(BakedGood(name='Chocolate cruller', price=3.40, bakery=bakeries[1]));
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String)
+    created_at = db.Column(db.DateTime, server_default=db.func.now())
+    updated_at = db.Column(db.DateTime, onupdate=db.func.now())
 
-    db.session.add_all(baked_goods)
-    db.session.commit()
+    baked_goods = db.relationship('BakedGood', backref='bakery')
+
+    def __repr__(self):
+        return f'<Bakery {self.name}>'
+
+class BakedGood(db.Model, SerializerMixin):
+    __tablename__ = 'baked_goods'
+
+    serialize_rules = ('-bakery.baked_goods',)
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String)
+    price = db.Column(db.Integer)
+    created_at = db.Column(db.DateTime, server_default=db.func.now())
+    updated_at = db.Column(db.DateTime, onupdate=db.func.now())
+
+    bakery_id = db.Column(db.Integer, db.ForeignKey('bakeries.id'))
+
+    def __repr__(self):
+        return f'<Baked Good {self.name}, ${self.price}>'
